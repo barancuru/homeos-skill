@@ -1,6 +1,6 @@
 # HomeOS API ve MCP başvurusu
 
-Sürüm: HomeOS 0.10.125, REST API 0.5.14, MCP 0.7.17 (2026-11-17). Canlı REST şeması: `GET https://home.curu.tr/api/openapi.json` (anahtar istemez). MCP'de kesin liste `tools/list`'tir; bu dosyayla çelişirse canlı yanıt doğrudur.
+Sürüm: HomeOS 0.10.126, REST API 0.5.14, MCP 0.7.18 (2026-11-17). Canlı REST şeması: `GET https://home.curu.tr/api/openapi.json` (anahtar istemez). MCP'de kesin liste `tools/list`'tir; bu dosyayla çelişirse canlı yanıt doğrudur.
 
 ## Kimlik doğrulama
 İki yol vardır, ikisi de aynı delegasyon, hane ve kota kurallarına bağlıdır.
@@ -55,7 +55,7 @@ Durumsuz Streamable HTTP, yalnız JSON yanıt (SSE yok, `GET` 405). Protokol `20
 | `homeos_list_payment_logs` | `payment_id`, `since`, `until`, `limit`, `offset`: ödeme kayıtları (`id`, `payment_id`, `title`, `paid_on`, `amount`, `currency`, `paid_by`, `shared_expense_id`, `added_by_agent`); silmek için `id` → `homeos_delete payment_log` |
 | `homeos_list_personal_entries` | `since`, `until`, `category`, `currency`, `kind`, `limit`, `offset` (her kayıtta `account` ve `attachment_count`) |
 | `homeos_list_personal_categories` | `include_archived` |
-| `homeos_list_budgets`, `homeos_list_balances`, `homeos_list_subscriptions` | `currency` |
+| `homeos_list_budgets`, `homeos_list_balances`, `homeos_list_subscriptions` | `currency` (`homeos_list_subscriptions` yalnız kişisel abonelikleri döndürür, her satırda `scope: personal`) |
 | `homeos_finance_summary` | `period` (`week`/`month`), `currency`: kişisel kayıtlara ek olarak ödenmiş düzenli ödemeler (kişinin payı) ve abonelik yenilemeleri (eklendiği tarihten sonra) ayrı satırda; ödenmemiş vadeler `expected` altında. Ortak ödemenin açtığı kişisel kayıt iki kez sayılmaz |
 | `homeos_list_health_daily` | yalnız sağlık izni ve geçerli rıza varsa görünür |
 
@@ -93,11 +93,13 @@ Durumsuz Streamable HTTP, yalnız JSON yanıt (SSE yok, `GET` 405). Protokol `20
 | `homeos_update_maintenance_plan` | `plan_id`*, `title`, `next_due`, `repeat_rule`, `repeat_days`, `repeat_day`, `repeat_window_end`, `description`, `is_active` (görevli ve checklist değişmez) |
 | `homeos_update_recurring_payment` | `payment_id`*, `homeos_add_recurring_payment` alanları (pasif ödeme güncellenmez) |
 | `homeos_update_subscription` | `subscription_id`*, `name`, `provider`, `amount`, `currency`, `next_due_on`, `repeat_months` (yalnız ev aboneliği; hane yöneticisi) |
+| `homeos_update_personal_subscription` | `subscription_id`* (`homeos_list_subscriptions`, satırda `scope: personal`), `name`, `amount`, `currency`, `period`, `renews_on_day`, `renews_month`, `account` (hesap adı; boş metin bağı kaldırır, adla hesap yoksa hata), `reminder_days`. Yalnız kendi aboneliğin |
+| `homeos_update_account` | `account_id`* (`homeos_list_balances`), `name`, `floor_amount` (boş metin = taban yok). Bakiye ve para birimi değişmez; bakiye için `homeos_set_balance` |
 | `homeos_update_location` | `location_id`*, `name`, `parent_id` (0 = kök), `kind` (boş metin türü temizler) |
 | `homeos_update_category` | `category_id`*, `name`, `parent_id` (0 = kök) |
 
 - Yanıt: `{"updated":tür,"<kimlik>":…,"changed":true|false,"changes":{"alan":{"old","new"}}}`. Aynı `request_id` ile tekrar ilk yanıtı döner, ikinci kez uygulanmaz. Her değişiklik denetim kaydına eski ve yeni değerle, "ajan" işaretiyle yazılır.
-- Arşivdeki kayıt güncellenmez ("arşivde; önce homeos_restore"). Kişisel abonelik için güncelleme aracı henüz yoktur.
+- Arşivdeki kayıt güncellenmez ("arşivde; önce homeos_restore").
 
 **Arşivleme ve silme (yazma + `mcp:delete`; hepsi `request_id`*, `type`*, `id`* ister; `destructiveHint`):**
 | Araç | `type` (★ = yalnız hane sahibi) |

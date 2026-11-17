@@ -14,7 +14,7 @@
 Tarayıcıda HomeOS açılır. Giriş yap, hane seç ve izinleri işaretle:
 - **Okuma**: soru sormak için yeterli.
 - **Yazma**: Claude'un kayıt eklemesini istiyorsan işaretle.
-- **Güncelleme**: Claude'un var olan kaydı (eşya, bakım planı, ödeme, ev aboneliği, konum, kategori) düzeltmesini istiyorsan, yazmayla birlikte işaretle. Claude her değişiklikten önce eski ve yeni değeri gösterip sorar.
+- **Güncelleme**: Claude'un var olan kaydı (eşya, bakım planı, ödeme, abonelik, hesap, konum, kategori) düzeltmesini istiyorsan, yazmayla birlikte işaretle. Claude her değişiklikten önce eski ve yeni değeri gösterip sorar.
 - **Arşivleme ve silme**: Claude'un kayıt arşivlemesini ya da silmesini istiyorsan, yazmayla birlikte işaretle. Claude her işlemden önce sorar; silme geri alınamaz.
 - **Sağlık**: yalnız sağlık özetini paylaşmak istiyorsan işaretle. Ayrıca rıza ister.
 
