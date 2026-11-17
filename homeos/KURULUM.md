@@ -13,7 +13,8 @@
 
 Tarayıcıda HomeOS açılır. Giriş yap, hane seç ve izinleri işaretle:
 - **Okuma**: soru sormak için yeterli.
-- **Yazma**: Claude'un kayıt eklemesini istiyorsan işaretle. Düzenleme yoktur.
+- **Yazma**: Claude'un kayıt eklemesini istiyorsan işaretle.
+- **Güncelleme**: Claude'un var olan kaydı (eşya, bakım planı, ödeme, ev aboneliği, konum, kategori) düzeltmesini istiyorsan, yazmayla birlikte işaretle. Claude her değişiklikten önce eski ve yeni değeri gösterip sorar.
 - **Arşivleme ve silme**: Claude'un kayıt arşivlemesini ya da silmesini istiyorsan, yazmayla birlikte işaretle. Claude her işlemden önce sorar; silme geri alınamaz.
 - **Sağlık**: yalnız sağlık özetini paylaşmak istiyorsan işaretle. Ayrıca rıza ister.
 
@@ -26,7 +27,7 @@ Sonra sor: *"HomeOS'ta önümüzdeki 3 ayda garantisi bitecek ya da bakımı gel
 Bağlantıyı kesmek için: Entegrasyonlar → API erişimim → bağlantıyı iptal et.
 
 ## 3. Yedek yol: API anahtarı (bağlayıcı kullanamıyorsan)
-1. Entegrasyonlar → API erişimim → **API anahtarı oluştur**. Kayıt eklenmesini istiyorsan "yazma izni"ni, arşivleme ve silme de istiyorsan ayrıca "arşivleme ve silme izni"ni işaretle. Anahtar (`hos_…`) yalnız bir kez gösterilir; parola kasana kaydet.
+1. Entegrasyonlar → API erişimim → **API anahtarı oluştur**. Kayıt eklenmesini istiyorsan "yazma izni"ni, güncelleme de istiyorsan "güncelleme izni"ni, arşivleme ve silme de istiyorsan ayrıca "arşivleme ve silme izni"ni işaretle. Anahtar (`hos_…`) yalnız bir kez gösterilir; parola kasana kaydet.
 2. Anahtarı ortam değişkeni olarak tanımla. **Sohbete yapıştırma.**
    - **Linux / macOS:** `echo "export HOMEOS_API_TOKEN='hos_...'" >> ~/.bashrc` (zsh kullanıyorsan `~/.zshrc`), sonra `source ~/.bashrc`.
    - **Windows (PowerShell, bir kez):** `[Environment]::SetEnvironmentVariable('HOMEOS_API_TOKEN','hos_...','User')`. Değişkeni açık pencereler görmez, yeni pencere aç.

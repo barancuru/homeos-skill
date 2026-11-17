@@ -1,11 +1,11 @@
 # HomeOS API ve MCP başvurusu
 
-Sürüm: HomeOS 0.10.119, REST API 0.5.11, MCP 0.7.11 (2026-11-16). Canlı REST şeması: `GET https://home.curu.tr/api/openapi.json` (anahtar istemez). MCP'de kesin liste `tools/list`'tir; bu dosyayla çelişirse canlı yanıt doğrudur.
+Sürüm: HomeOS 0.10.125, REST API 0.5.14, MCP 0.7.17 (2026-11-17). Canlı REST şeması: `GET https://home.curu.tr/api/openapi.json` (anahtar istemez). MCP'de kesin liste `tools/list`'tir; bu dosyayla çelişirse canlı yanıt doğrudur.
 
 ## Kimlik doğrulama
 İki yol vardır, ikisi de aynı delegasyon, hane ve kota kurallarına bağlıdır.
-- **OAuth (MCP için önerilen):** `https://home.curu.tr/mcp` adresine bağlanan istemci OAuth 2.1 akışını kendisi yürütür (dinamik istemci kaydı, PKCE S256). Kapsamlar: `mcp:read`, `mcp:write`, `mcp:delete` (yalnız `mcp:write` ile), `mcp:health`. Erişim belirteci (`hoa_`) 1 saat, yenileme belirteci (`hor_`) 30 gün geçerlidir ve her kullanımda değişir. Bağlantı kullanıcının "API erişimim" sayfasında bir anahtar gibi listelenir ve oradan iptal edilir.
-- **API anahtarı:** `Authorization: Bearer hos_<43 karakter>` (yedek başlık: `X-HomeOS-Api-Key`). Anahtar URL'de, çerezde ya da gövdede kabul edilmez. Ömrü paket ayarına bağlıdır (en çok 90 gün). Oluştururken seçilenler: **yazma izni** (ekleme araçları), **arşivleme ve silme izni** (yalnız yazma izniyle), **taslak zorunlu** (kişisel kayıtlar onay bekler), **sağlık okuma** (ayrıca rıza gerekir).
+- **OAuth (MCP için önerilen):** `https://home.curu.tr/mcp` adresine bağlanan istemci OAuth 2.1 akışını kendisi yürütür (dinamik istemci kaydı, PKCE S256). Kapsamlar: `mcp:read`, `mcp:write`, `mcp:update` ve `mcp:delete` (ikisi de yalnız `mcp:write` ile), `mcp:health`. Erişim belirteci (`hoa_`) 1 saat, yenileme belirteci (`hor_`) 30 gün geçerlidir ve her kullanımda değişir. Bağlantı kullanıcının "API erişimim" sayfasında bir anahtar gibi listelenir ve oradan iptal edilir.
+- **API anahtarı:** `Authorization: Bearer hos_<43 karakter>` (yedek başlık: `X-HomeOS-Api-Key`). Anahtar URL'de, çerezde ya da gövdede kabul edilmez. Ömrü paket ayarına bağlıdır (en çok 90 gün). Oluştururken seçilenler: **yazma izni** (ekleme araçları), **güncelleme izni** (yalnız yazma izniyle), **arşivleme ve silme izni** (yalnız yazma izniyle), **taslak zorunlu** (kişisel kayıtlar onay bekler), **sağlık okuma** (ayrıca rıza gerekir).
 - Geçerlilik için aktif API delegasyonu, aktif hesap ve aktif hane üyeliği gerekir; biri biterse `401` döner.
 - **Delegasyon:** e-postası doğrulanan kullanıcıya ilk hanesinde ücretsiz paket kendiliğinden açılır. Hane sahibi, Entegrasyonlar → API erişimim'den kendine ya da e-postası doğrulanmış bir üyeye ücretsiz delegasyon açabilir (24 saatte en çok 3). Yöneticinin kapattığı delegasyon buradan yeniden açılamaz.
 - `hhc_` Health Connect cihaz anahtarları yalnız `POST /api/v1/health-connect/daily` içindir; bu skill'in işi değildir.
@@ -18,11 +18,12 @@ Sürüm: HomeOS 0.10.119, REST API 0.5.11, MCP 0.7.11 (2026-11-16). Canlı REST 
 ## REST (`https://home.curu.tr/api/v1`, yalnız GET)
 | Yol | Döner | Sorgu (`limit`, `offset` hepsinde) |
 |---|---|---|
-| `/assets` | Varlıklar, `asset_no` sırasıyla (arşivliler yalnız `include_archived=true` ile, `archived_at` alanıyla) | `warranty_before`, `status`, `q`, `updated_since`, `include_archived` |
+| `/assets` | Varlıklar, `asset_no` sırasıyla (arşivliler yalnız `include_archived=true` ile, `archived_at` alanıyla) | `warranty_before`, `status`, `q`, `updated_since`, `include_archived`, `ownership` |
 | `/assets/{asset_no}` | Tek varlık (gövde doğrudan nesne; son bakımlar ve para birimine göre maliyet toplamı dahil) | — |
 | `/maintenance/plans` | Bakım planları, `next_due` sırasıyla | `due_before`, `asset_no`, `is_active` |
 | `/maintenance/logs` | Tamamlanan bakımlar, yeniden eskiye | `asset_no`, `since`, `until` |
-| `/categories`, `/locations` | Hiyerarşi düğümleri (`id`, `parent_id`, `name`; konumda `facade`, `floor`) | — |
+| `/categories`, `/locations` | Hiyerarşi düğümleri (`id`, `parent_id`, `name`, `archived_at`; konumda `facade`, `floor`, `kind`) | — |
+| `/recurring` | Tekrarlayan ödemeler (`ends_on`, `installments_total`, `installments_remaining`, `amount_is_estimate` dahil) | `include_inactive` |
 | `/finance/entries` | Varlık maliyet kayıtları | `asset_no`, `since`, `until` |
 | `/documents` | Belge üst bilgisi | `expires_before`, `asset_no` |
 | `/recurring/logs` | Tekrarlayan ödeme kayıtları, yeniden eskiye | `payment_id`, `since`, `until` |
@@ -37,31 +38,33 @@ Durumsuz Streamable HTTP, yalnız JSON yanıt (SSE yok, `GET` 405). Protokol `20
 **Okuma (her bağlantı):**
 | Araç | Argüman |
 |---|---|
-| `homeos_list_assets` | `limit`, `offset`, `warranty_before`, `status` (`active`/`stored`/`retired`), `q`, `updated_since`, `include_archived` |
+| `homeos_list_assets` | `limit`, `offset`, `warranty_before`, `status` (`active`/`stored`/`retired`), `q`, `updated_since`, `include_archived`, `ownership` (`household`/`landlord`/`unknown`) |
 | `homeos_get_asset` | `asset_no`* (arşivli varlığı da `archived: true` ile döndürür; bağlı `contacts` ve `insurance` dahil) |
-| `homeos_list_maintenance_plans` | `limit`, `offset`, `due_before`, `asset_no`, `is_active` |
+| `homeos_list_maintenance_plans` | `limit`, `offset`, `due_before`, `asset_no`, `is_active` (yanıtta `due_unverified: true` = örnek plan, tarih doğrulanmadı) |
 | `homeos_list_maintenance_logs` | `limit`, `offset`, `asset_no`, `since`, `until` |
-| `homeos_list_categories`, `homeos_list_locations` | `limit`, `offset` |
+| `homeos_list_categories`, `homeos_list_locations` | `limit`, `offset` (arşivliler `archived_at` dolu; konumda `kind`: `indoor`/`common_area`/`outdoor`/null) |
 | `homeos_list_finance_entries` | `limit`, `offset`, `asset_no`, `since`, `until` |
 | `homeos_list_members` | — (user_id, ad, rol; e-posta dönmez) |
 | `homeos_list_contacts` | `asset_no`, `q`, `limit`, `offset`: dış paydaşlar (`id`, iletişim, bağlı varlıklar ve rolleri) |
-| `homeos_list_insurance` | `asset_no`, `expires_before`, `limit`, `offset`: poliçeler (`id`, tür, sağlayıcı, tarih, prim, teminat) |
+| `homeos_list_insurance` | `asset_no`, `expires_before`, `limit`, `offset`: poliçeler (`id`, `scope` (`asset`/`household`), tür, sağlayıcı, tarih, prim, teminat; hane poliçesinde `asset_no: null`) |
 | `homeos_usage` | —: dakika sınırı ve kalan, aylık kota ve kalan, bağlantı bitişi, protokol sınırı (kotaya sayılmaz) |
 | `homeos_list_documents` | `limit`, `offset`, `expires_before`, `asset_no` (`source`: asset, household, personal_entry); her satırda `key` (`asset:2` gibi; kimlik kaynaklar arasında çakışır, tekil tanım `key`'dir) |
 | `homeos_due` | `from`*, `to`* (en çok 400 gün), `include_overdue` (varsayılan true): bakım, tekrarlayan ödeme, garanti, hane belgesi (`documents`) ve poliçe (`insurance`) bitişleri; `overdue` kullanıcının saat dilimindeki **bugüne** göredir (sorgunun `from`'una göre değil); `from`'dan önce vadesi geçmiş etkin kalemleri `include_overdue` dahil eder; garanti, belge ve poliçe satırları da aynı kuralla `overdue` alır; arşivdeki varlığın garantisi girmez, `counts.overdue` sayar; garanti satırları da `kind: warranty_expiry` ve `overdue` taşır |
 | `homeos_list_shared_expenses` | `since`, `until`, `currency`, `limit`, `offset` (`balances`: üye başına net) |
-| `homeos_list_recurring` | `limit`, `offset`, `include_inactive` ya da eşdeğeri `include_archived` (varsayılan yalnız etkinler; pasifler `active: false`); her ödemede `last_paid_on`, `log_count` |
+| `homeos_list_recurring` | `limit`, `offset`, `include_inactive` ya da eşdeğeri `include_archived` (varsayılan yalnız etkinler; pasifler `active: false`); her ödemede `last_paid_on`, `log_count`, `ends_on`, `installments_total`, `installments_remaining`, `amount_is_estimate`; son taksit ödenince ödeme pasifleşir, bitiş geçmiş ama ödenmemiş vade gecikmiş kalır |
 | `homeos_list_payment_logs` | `payment_id`, `since`, `until`, `limit`, `offset`: ödeme kayıtları (`id`, `payment_id`, `title`, `paid_on`, `amount`, `currency`, `paid_by`, `shared_expense_id`, `added_by_agent`); silmek için `id` → `homeos_delete payment_log` |
 | `homeos_list_personal_entries` | `since`, `until`, `category`, `currency`, `kind`, `limit`, `offset` (her kayıtta `account` ve `attachment_count`) |
 | `homeos_list_personal_categories` | `include_archived` |
 | `homeos_list_budgets`, `homeos_list_balances`, `homeos_list_subscriptions` | `currency` |
-| `homeos_finance_summary` | `period` (`week`/`month`), `currency` |
+| `homeos_finance_summary` | `period` (`week`/`month`), `currency`: kişisel kayıtlara ek olarak ödenmiş düzenli ödemeler (kişinin payı) ve abonelik yenilemeleri (eklendiği tarihten sonra) ayrı satırda; ödenmemiş vadeler `expected` altında. Ortak ödemenin açtığı kişisel kayıt iki kez sayılmaz |
 | `homeos_list_health_daily` | yalnız sağlık izni ve geçerli rıza varsa görünür |
 
-**Ekleme (yalnız yazma izinli bağlantı; hepsi `request_id`* ister, düzenleme aracı yoktur):**
+**Ekleme (yalnız yazma izinli bağlantı; hepsi `request_id`* ister):**
 | Araç | Argüman |
 |---|---|
-| `homeos_create_asset` | `name`*, `category`, `brand`, `model`, `serial_number`, `location`, `status`, `purchased_on`, `purchase_price`, `currency`, `useful_life_years`, `warranty_until`, `notes`, `usage_warnings` |
+| `homeos_create_asset` | `name`*, `category`, `brand`, `model`, `serial_number`, `location`, `status`, `purchased_on`, `purchase_price`, `currency`, `useful_life_years`, `warranty_until`, `notes`, `usage_warnings`, `ownership` (`household`/`landlord`/`unknown`). `category`/`location` yolu `Üst > Alt`; yeni ad listeye eklenir, yanıtta `created_locations`/`created_categories`, başka üst altında aynı ad varsa `similar_locations` |
+| `homeos_create_location` | `name`*, `parent_id` (boş = kök), `facade` (`K`/`D`/`G`/`B`), `floor`, `kind` (`indoor`/`common_area`/`outdoor`). Aynı seviyede aynı ad (harf farkı dahil) yeni kayıt açmaz: `existing: true` |
+| `homeos_create_category` | `name`*, `parent_id`. Aynı kural |
 | `homeos_create_maintenance_plan` | `asset_no`*, `title`*, `next_due`*, `repeat_rule` (`days` varsayılan / `monthly_day` her ayın `repeat_day`. günü / `monthly_window` her ayın `repeat_day`–`repeat_window_end` arası), `repeat_days` (yalnız `days`), `repeat_day`, `repeat_window_end`, `description`, `is_active` |
 | `homeos_log_maintenance` | `plan_id`*, `performed_on`*, `cost`, `currency` (`TRY`/`USD`/`EUR`; boşsa varlığın para birimi), `note` |
 | `homeos_add_asset_expense` | `asset_no`*, `occurred_on`*, `kind`* (`repair`/`operation`/`improvement`/`other`), `amount`*, `currency`*, `description`* |
@@ -72,21 +75,35 @@ Durumsuz Streamable HTTP, yalnız JSON yanıt (SSE yok, `GET` 405). Protokol `20
 | `homeos_add_subscription` | `name`*, `amount`*, `renews_on_day`*, `currency`, `period` (`month`/`year`), `renews_month`, `account`, `reminder_days` |
 | `homeos_add_shared_expense` | `amount`*, `currency`, `occurred_on`, `category`, `note`, `split_method` (`equal`/`shares`/`amounts`), `participants` (virgüllü user_id; boş = tüm üyeler), `values`, `items`. Ödeyen bağlantının sahibidir. |
 | `homeos_mark_paid` | `payment_id`*, `paid_on`, `amount` (ortak ödemede eşit bölüşümlü ortak gider açılır) |
-| `homeos_add_recurring_payment` | `title`*, `amount`*, `next_due`*, `currency`, `category`, `repeat_rule` (`days`/`monthly_day`/`monthly_window`), `repeat_days`, `repeat_day`, `repeat_window_end`, `responsible_user_id` (`homeos_list_members`), `shared` |
+| `homeos_add_recurring_payment` | `title`*, `amount`*, `next_due`*, `currency`, `category`, `repeat_rule` (`days`/`monthly_day`/`monthly_window`), `repeat_days`, `repeat_day`, `repeat_window_end`, `responsible_user_id` (`homeos_list_members`), `shared`, `ends_on`, `installments_total`, `amount_is_estimate` |
 | `homeos_add_contact` | `name`*, `organization`, `phone`, `email`, `website` (https), `notes`, `asset_no` + `role` (`seller`/`maintainer`; ikisi birlikte) |
-| `homeos_add_insurance` | `asset_no`*, `insurance_type`* (`dask/traffic/casco/home/mandatory/health/other`), `starts_on`*, `ends_on`*, `premium`*, `coverage`*, `currency`*, `provider`, `policy_number` |
+| `homeos_add_insurance` | `asset_no` (verilmezse hane poliçesi: DASK, konut), `insurance_type`* (`dask/traffic/casco/home/mandatory/health/other`), `starts_on`*, `ends_on`*, `premium`*, `coverage`*, `currency`*, `provider`, `policy_number` |
 | `homeos_add_household_document` | `filename`*, `content_base64`* (en çok 8 MB; taranır ve şifrelenir), `title`, `kind` (`lease`/`deposit`/`policy`/`other`), `expires_on`, `remind_days`, `deposit_amount`, `deposit_currency` |
 | `homeos_add_asset_document` | `asset_no`* (arşivlenmemiş), `filename`*, `content_base64`* (en çok 8 MB; PDF, JPEG, PNG, WebP, TXT, DOCX, XLSX; taranır ve şifrelenir). Sonuç `homeos_list_documents`'ta `source: asset` olarak görünür |
+| `homeos_add_asset_photo` | `asset_no`* (arşivlenmemiş), `filename`*, `content_base64`* (JPEG/PNG/WebP, en çok 5 MB; yeniden çizilir ve şifrelenir). Eşya başına bir fotoğraf; varsa reddedilir |
 
 - `request_id`: 8–64 karakter, `A-Z a-z 0-9 . _ : -`. Aynı kimlikle ikinci çağrı yeni kayıt açmaz, ilk sonucu döner. Ağ hatasından sonra aynı `request_id` ile dene.
 - Ajanın eklediği kayıtlar arayüzde "Ajan ekledi" işaretiyle görünür.
 - `draft: true` olan kişisel kayıt toplamlara, sınırlara ve bakiyeye girmez; kullanıcı Bütçem'deki "Onay bekleyen fişler" kutusunda onaylar ya da reddeder.
 
+**Güncelleme (yazma + `mcp:update`; hepsi `request_id`* ister, yalnız verilen alanlar değişir):**
+| Araç | Argüman |
+|---|---|
+| `homeos_update_asset` | `asset_no`*, sonra `homeos_create_asset` alanlarından istenenler (`ownership` dahil). Boş metin isteğe bağlı alanı temizler |
+| `homeos_update_maintenance_plan` | `plan_id`*, `title`, `next_due`, `repeat_rule`, `repeat_days`, `repeat_day`, `repeat_window_end`, `description`, `is_active` (görevli ve checklist değişmez) |
+| `homeos_update_recurring_payment` | `payment_id`*, `homeos_add_recurring_payment` alanları (pasif ödeme güncellenmez) |
+| `homeos_update_subscription` | `subscription_id`*, `name`, `provider`, `amount`, `currency`, `next_due_on`, `repeat_months` (yalnız ev aboneliği; hane yöneticisi) |
+| `homeos_update_location` | `location_id`*, `name`, `parent_id` (0 = kök), `kind` (boş metin türü temizler) |
+| `homeos_update_category` | `category_id`*, `name`, `parent_id` (0 = kök) |
+
+- Yanıt: `{"updated":tür,"<kimlik>":…,"changed":true|false,"changes":{"alan":{"old","new"}}}`. Aynı `request_id` ile tekrar ilk yanıtı döner, ikinci kez uygulanmaz. Her değişiklik denetim kaydına eski ve yeni değerle, "ajan" işaretiyle yazılır.
+- Arşivdeki kayıt güncellenmez ("arşivde; önce homeos_restore"). Kişisel abonelik için güncelleme aracı henüz yoktur.
+
 **Arşivleme ve silme (yazma + `mcp:delete`; hepsi `request_id`*, `type`*, `id`* ister; `destructiveHint`):**
 | Araç | `type` (★ = yalnız hane sahibi) |
 |---|---|
-| `homeos_archive` | `asset`★ (`id` = `asset_no`), `maintenance_plan`★, `tax_item`★, `damage_report`, `chore`, `recurring_payment`, `personal_account`, `personal_category`, `personal_budget_limit`, `personal_subscription` |
-| `homeos_restore` | `asset`★ (`with_plans: true` ile arşivli planları da geri alır), `maintenance_plan`★ (önce varlığı etkin olmalı), `personal_category`, `recurring_payment` (pasif ödemeyi etkinleştirir; vade geçmişse `next_due` zorunlu, bugün ya da sonrası) |
+| `homeos_archive` | `asset`★ (`id` = `asset_no`), `maintenance_plan`★, `tax_item`★, `damage_report`, `chore`, `recurring_payment`, `personal_account`, `personal_category`, `personal_budget_limit`, `personal_subscription`, `location`, `category` (`confirm_name` tam ad; içinde etkin eşya ya da arşivlenmemiş alt kayıt varsa reddedilir) |
+| `homeos_restore` | `asset`★ (`with_plans: true` ile arşivli planları da geri alır), `maintenance_plan`★ (önce varlığı etkin olmalı), `personal_category`, `recurring_payment` (pasif ödemeyi etkinleştirir; vade geçmişse `next_due` zorunlu, bugün ya da sonrası), `location` ve `category` (`confirm_name` tam ad; üst kayıt arşivdeyse önce o) |
 | `homeos_delete` | `document`★ (+ zorunlu `source`: `asset`/`household`, listedeki satırdan), `document` + `source: personal_entry` (fiş dosyası; yalnız kaydın sahibi), `maintenance_log` (hane sahibi ya da kaydı giren; en son kayıtsa `restore_due` varsayılan true ile `next_due` önceki değerine döner, 0.10.115 öncesi kayıtlarda dönmez), `payment_log` (hane sahibi ya da ödeyen; `with_shared_expense: true` bağlı ortak gideri de siler; en son kayıtsa `restore_due` ile `next_due` geri döner), `household_document`★ (eski; `document` + `source: household` ile aynı), `asset_expense`★, `contact`★, `insurance`, `personal_entry`, `shared_expense`; **yalnız arşivdeyse:** `asset`★ (`id` = `asset_no`), `maintenance_plan`★, `subscription`★ (ev aboneliği), `tax_item`★, `damage_report`, `chore`, `recurring_payment`, `personal_account`, `personal_category`, `personal_budget_limit`, `personal_subscription` |
 
 - `asset` ve `maintenance_plan` arşivinde `confirm_name` zorunludur: varlık adı ya da plan başlığı, tam olarak. Geri almada istenmez.
@@ -95,7 +112,7 @@ Durumsuz Streamable HTTP, yalnız JSON yanıt (SSE yok, `GET` 405). Protokol `20
 - Her çağrı denetim kaydına tür ve kimlikle yazılır. Başarılı sonuç: `{"done":"archive|restore|delete","type","id","request_id"}`.
 
 ## Alanlar
-- **Asset:** `asset_no` (hane içi numara, kimlik budur), `name`, `category`, `location`, `brand`, `model`, `status`, `purchased_on`, `purchase_price` (metin), `currency`, `useful_life_years`, `warranty_until`.
+- **Asset:** `asset_no` (hane içi numara, kimlik budur), `name`, `category`, `location`, `brand`, `model`, `status`, `purchased_on`, `purchase_price` (metin), `currency`, `useful_life_years`, `warranty_until`, `ownership` (`household` hanenin, `landlord` ev sahibinin, `unknown`).
 - **MaintenancePlan:** `id`, `asset_no`, `title`, `description`, `next_due`, `repeat_rule` (`days`/`monthly_day`/`monthly_window`), `repeat_days` (null = tek seferlik; aylık kurallarda yaklaşık değer, hesapta kullanma), `repeat_day`, `repeat_window_end`, `repeat_label` (okunur, ör. "Her ayın 5'i"), `is_active`, `assigned_to` (user_id). Sonraki tarih için `next_due` ya da `homeos_due`.
 - **MaintenanceLog:** `id`, `asset_no`, `title`, `performed_on`, `cost` (metin), `currency` (0.10.101 öncesi kayıtlar `TRY`), `note`, `plan_archived` (arşivlenmiş planın kaydı da listelenir ve maliyet toplamına girer).
 - **FinanceEntry:** `id` (`homeos_delete asset_expense` için), `asset_no`, `occurred_on`, `kind`, `amount` (metin), `currency`, `description`.
@@ -122,6 +139,6 @@ Durumsuz Streamable HTTP, yalnız JSON yanıt (SSE yok, `GET` 405). Protokol `20
 | 429 | `rate_limited` / `monthly_quota_exceeded` | Gövdedeki `retry_after` (saniye) kadar bekle; döngüyle deneme |
 | 500 | `internal_error` | Bir kez sonra yeniden dene; sürerse kullanıcıya bildir |
 | MCP 403 | `invalid_origin` / `invalid_host` | Adres `https://home.curu.tr/mcp` olmalı (port 443) |
-| MCP `-32001` | `write_not_permitted` / `delete_not_permitted` | Bağlantının yazma ya da arşivleme/silme izni yok |
+| MCP `-32001` | `write_not_permitted` / `update_not_permitted` / `delete_not_permitted` | Bağlantının yazma, güncelleme ya da arşivleme/silme izni yok |
 | MCP `-32001` | `owner_required` | İşlemi yalnız hane sahibi yapabilir |
 | MCP `-32602` | `message` | Araç adı ya da argüman geçersiz. Yazma araçlarında mesaj alanı söyler (ör. `amount: en çok 2 ondalık`); düzeltip yeni `request_id` ile dene |

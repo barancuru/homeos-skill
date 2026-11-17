@@ -1,6 +1,6 @@
 # HomeOS skill'i
 
-[HomeOS](https://home.curu.tr) (ev yönetimi: envanter, garanti, bakım, belgeler, ortak gider, tekrarlayan ödemeler, kişisel bütçe) için Claude skill'i. Claude, HomeOS'u kendi yetkinle okur, kayıt ekler ve senin onayınla arşivler ya da siler.
+[HomeOS](https://home.curu.tr) (ev yönetimi: envanter, garanti, bakım, belgeler, ortak gider, tekrarlayan ödemeler, kişisel bütçe) için Claude skill'i. Claude, HomeOS'u kendi yetkinle okur, kayıt ekler; senin onayınla günceller, arşivler ya da siler.
 
 ## Kurulum
 Ayrıntılı adımlar: [`homeos/KURULUM.md`](homeos/KURULUM.md). Kısaca:
