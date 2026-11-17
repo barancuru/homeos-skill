@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# HomeOS client (REST reads; MCP reads and, with a write-enabled key, add-only tools). The key is read from HOMEOS_API_TOKEN and sent only in a request header:
+# it never appears in argv, the URL, stdout or stderr.
+#   homeos-api check                       is the key accepted? (one cheap request)
+#   homeos-api get <path> [key=value ...]  REST (read only): assets | assets/<no> | maintenance/plans | maintenance/logs
+#                                          | categories | locations | finance/entries | documents | health/daily | recurring/logs
+#                                          query: limit(1-200) offset asset_no status q is_active and dates (YYYY-MM-DD):
+#                                          warranty_before updated_since due_before since until expires_before from to
+#   homeos-api mcp <method> [params-json]  MCP JSON-RPC, e.g. tools/list, or
+#                                          tools/call '{"name":"homeos_list_assets","arguments":{"limit":100,"offset":100}}'
+# Body goes to stdout; "HTTP <code>" (and Retry-After on 429) goes to stderr. Exit 0 only on 2xx.
+set -euo pipefail
+
+URL="${HOMEOS_URL:-https://home.curu.tr}"; URL="${URL%/}"
+kullanim() { sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
+
+[ $# -ge 1 ] || kullanim
+case "$URL" in https://*) ;; *) echo "HOMEOS_URL https:// ile başlamalı" >&2; exit 2 ;; esac
+TOKEN="${HOMEOS_API_TOKEN:-}"
+if [ -z "$TOKEN" ]; then
+  echo "HOMEOS_API_TOKEN tanımlı değil. Anahtarı kullanıcı kendi kabuğunda tanımlar (sohbete yazılmaz)." >&2; exit 3
+fi
+[[ "$TOKEN" =~ ^hos_[A-Za-z0-9_-]{43}$ ]] || { echo "HOMEOS_API_TOKEN biçimi geçersiz (hos_ + 43 karakter bekleniyor)." >&2; exit 3; }
+
+istek() {  # istek <method> <url> [json-body]
+  local yanit kod govde
+  local args=(-sS --max-time 30 -X "$1" -H 'Accept: application/json' -D - -o -)
+  [ $# -ge 3 ] && args+=(-H 'Content-Type: application/json' -H 'MCP-Protocol-Version: 2025-11-25' --data-binary "$3")
+  # header via curl config on stdin (printf is a builtin, so the key never shows in the process list)
+  yanit=$(printf 'header = "Authorization: Bearer %s"\n' "$TOKEN" | curl -K - "${args[@]}" "$2") || { echo "ağ hatası" >&2; return 4; }
+  kod=$(printf '%s' "$yanit" | awk 'NR==1{print $2}')
+  govde=$(printf '%s' "$yanit" | awk 'f{print} /^\r?$/{f=1}')
+  printf '%s\n' "$govde"
+  echo "HTTP $kod" >&2
+  [ "$kod" = 429 ] && printf '%s' "$yanit" | grep -i '^retry-after:' >&2 || true
+  [[ "$kod" =~ ^2 ]]
+}
+
+case "$1" in
+  check)
+    istek GET "$URL/api/v1/categories?limit=1" >/dev/null && echo "anahtar geçerli" ;;
+  get)
+    [ $# -ge 2 ] || kullanim
+    yol="${2#/}"; sorgu=""
+    [[ "$yol" =~ ^(assets|assets/[1-9][0-9]{0,12}|maintenance/plans|maintenance/logs|categories|locations|finance/entries|documents|health/daily|recurring/logs)$ ]] \
+      || { echo "bilinmeyen yol: $yol" >&2; exit 2; }
+    for kv in "${@:3}"; do
+      [[ "$kv" =~ ^[0-9]+$ ]] && kv="limit=$kv"   # old form: get assets 200
+      if [[ "$kv" =~ ^(limit|offset|asset_no|payment_id)=[0-9]{1,6}$|^(warranty_before|updated_since|due_before|since|until|expires_before|from|to)=[0-9]{4}-[0-9]{2}-[0-9]{2}$|^status=(active|stored|retired)$|^is_active=(true|false)$ ]]; then
+        sorgu="$sorgu${sorgu:+&}$kv"
+      elif [[ "$kv" =~ ^q=(.{1,100})$ ]]; then   # free text: URL-encode it
+        sorgu="$sorgu${sorgu:+&}q=$(printf '%s' "${BASH_REMATCH[1]}" | od -An -tx1 | tr -d ' \n' | sed 's/../%&/g')"
+      else
+        echo "geçersiz sorgu: $kv (limit offset asset_no = sayı; tarih alanları YYYY-AA-GG; status active|stored|retired; is_active true|false; q metin)" >&2; exit 2
+      fi
+    done
+    istek GET "$URL/api/v1/$yol${sorgu:+?$sorgu}" ;;
+  mcp)
+    [ $# -ge 2 ] || kullanim
+    [[ "$2" =~ ^[a-z/]{1,40}$ ]] || { echo "geçersiz MCP metodu" >&2; exit 2; }
+    params="${3:-}"; [ -n "$params" ] || params='{}'
+    # Windows'ta python3 Store kısayolu olabilir: command -v bulur ama çalışmaz; gerçekten çalışıyor mu bak.
+    python3 -c '' 2>/dev/null && { python3 -c 'import json,sys; v=json.loads(sys.argv[1]); assert isinstance(v,dict)' "$params" 2>/dev/null \
+      || { echo "params bir JSON nesnesi olmalı" >&2; exit 2; }; }
+    istek POST "$URL/mcp" "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"$2\",\"params\":$params}" ;;
+  *) kullanim ;;
+esac

@@ -1,0 +1,5 @@
+# yerel paket ve özel yazışmalar depoya girmez
+*.zip
+Muhammed dönüş taslağı.md
+*taslağı.md
+.DS_Store
