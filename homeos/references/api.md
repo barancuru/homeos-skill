@@ -1,6 +1,6 @@
 # HomeOS API ve MCP başvurusu
 
-Sürüm: HomeOS 0.10.128 (2026-11-17); REST ve MCP sürümü için `openapi.json` ve `initialize` yanıtına bak. Canlı REST şeması: `GET https://home.curu.tr/api/openapi.json` (anahtar istemez). MCP'de kesin liste `tools/list`'tir; bu dosyayla çelişirse canlı yanıt doğrudur.
+Sürüm: HomeOS 0.10.128, REST API 0.5.18, MCP 0.7.22 (2026-11-17). Canlı REST şeması: `GET https://home.curu.tr/api/openapi.json` (anahtar istemez). MCP'de kesin liste `tools/list`'tir; bu dosyayla çelişirse canlı yanıt doğrudur.
 
 ## Kimlik doğrulama
 İki yol vardır, ikisi de aynı delegasyon, hane ve kota kurallarına bağlıdır.
