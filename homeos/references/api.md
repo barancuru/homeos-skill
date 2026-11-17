@@ -1,6 +1,6 @@
 # HomeOS API ve MCP başvurusu
 
-Sürüm: HomeOS 0.10.126, REST API 0.5.14, MCP 0.7.18 (2026-11-17). Canlı REST şeması: `GET https://home.curu.tr/api/openapi.json` (anahtar istemez). MCP'de kesin liste `tools/list`'tir; bu dosyayla çelişirse canlı yanıt doğrudur.
+Sürüm: HomeOS 0.10.127, REST API 0.5.16, MCP 0.7.20 (2026-11-17). Canlı REST şeması: `GET https://home.curu.tr/api/openapi.json` (anahtar istemez). MCP'de kesin liste `tools/list`'tir; bu dosyayla çelişirse canlı yanıt doğrudur.
 
 ## Kimlik doğrulama
 İki yol vardır, ikisi de aynı delegasyon, hane ve kota kurallarına bağlıdır.
@@ -20,9 +20,9 @@ Sürüm: HomeOS 0.10.126, REST API 0.5.14, MCP 0.7.18 (2026-11-17). Canlı REST 
 |---|---|---|
 | `/assets` | Varlıklar, `asset_no` sırasıyla (arşivliler yalnız `include_archived=true` ile, `archived_at` alanıyla) | `warranty_before`, `status`, `q`, `updated_since`, `include_archived`, `ownership` |
 | `/assets/{asset_no}` | Tek varlık (gövde doğrudan nesne; son bakımlar ve para birimine göre maliyet toplamı dahil) | — |
-| `/maintenance/plans` | Bakım planları, `next_due` sırasıyla | `due_before`, `asset_no`, `is_active` |
+| `/maintenance/plans` | Bakım planları, `next_due` sırasıyla | `due_before`, `asset_no`, `is_active`, `due_unverified` |
 | `/maintenance/logs` | Tamamlanan bakımlar, yeniden eskiye | `asset_no`, `since`, `until` |
-| `/categories`, `/locations` | Hiyerarşi düğümleri (`id`, `parent_id`, `name`, `archived_at`; konumda `facade`, `floor`, `kind`) | — |
+| `/categories`, `/locations` | Hiyerarşi düğümleri (`id`, `parent_id`, `name`, `archived_at`; konumda `facade`, `floor`, `kind`); arşivliler yalnız `include_archived=true` ile | `include_archived` |
 | `/recurring` | Tekrarlayan ödemeler (`ends_on`, `installments_total`, `installments_remaining`, `amount_is_estimate` dahil) | `include_inactive` |
 | `/finance/entries` | Varlık maliyet kayıtları | `asset_no`, `since`, `until` |
 | `/documents` | Belge üst bilgisi | `expires_before`, `asset_no` |
@@ -40,9 +40,9 @@ Durumsuz Streamable HTTP, yalnız JSON yanıt (SSE yok, `GET` 405). Protokol `20
 |---|---|
 | `homeos_list_assets` | `limit`, `offset`, `warranty_before`, `status` (`active`/`stored`/`retired`), `q`, `updated_since`, `include_archived`, `ownership` (`household`/`landlord`/`unknown`) |
 | `homeos_get_asset` | `asset_no`* (arşivli varlığı da `archived: true` ile döndürür; bağlı `contacts` ve `insurance` dahil) |
-| `homeos_list_maintenance_plans` | `limit`, `offset`, `due_before`, `asset_no`, `is_active` (yanıtta `due_unverified: true` = örnek plan, tarih doğrulanmadı) |
+| `homeos_list_maintenance_plans` | `limit`, `offset`, `due_before`, `asset_no`, `is_active`, `due_unverified` (yanıtta `due_unverified: true` = örnek plan, tarih doğrulanmadı) |
 | `homeos_list_maintenance_logs` | `limit`, `offset`, `asset_no`, `since`, `until` |
-| `homeos_list_categories`, `homeos_list_locations` | `limit`, `offset` (arşivliler `archived_at` dolu; konumda `kind`: `indoor`/`common_area`/`outdoor`/null) |
+| `homeos_list_categories`, `homeos_list_locations` | `limit`, `offset`, `include_archived` (varsayılan arşivliler dönmez; dönenlerde `archived_at` dolu; konumda `kind`: `indoor`/`common_area`/`outdoor`/null) |
 | `homeos_list_finance_entries` | `limit`, `offset`, `asset_no`, `since`, `until` |
 | `homeos_list_members` | — (user_id, ad, rol; e-posta dönmez) |
 | `homeos_list_contacts` | `asset_no`, `q`, `limit`, `offset`: dış paydaşlar (`id`, iletişim, bağlı varlıklar ve rolleri) |
@@ -56,7 +56,7 @@ Durumsuz Streamable HTTP, yalnız JSON yanıt (SSE yok, `GET` 405). Protokol `20
 | `homeos_list_personal_entries` | `since`, `until`, `category`, `currency`, `kind`, `limit`, `offset` (her kayıtta `account` ve `attachment_count`) |
 | `homeos_list_personal_categories` | `include_archived` |
 | `homeos_list_budgets`, `homeos_list_balances`, `homeos_list_subscriptions` | `currency` (`homeos_list_subscriptions` yalnız kişisel abonelikleri döndürür, her satırda `scope: personal`) |
-| `homeos_finance_summary` | `period` (`week`/`month`), `currency`: kişisel kayıtlara ek olarak ödenmiş düzenli ödemeler (kişinin payı) ve abonelik yenilemeleri (eklendiği tarihten sonra) ayrı satırda; ödenmemiş vadeler `expected` altında. Ortak ödemenin açtığı kişisel kayıt iki kez sayılmaz |
+| `homeos_finance_summary` | `period` (`week`/`month`), `currency`, `month` (`YYYY-AA`; boşsa içinde bulunulan dönem): kişisel kayıtlara ek olarak ödenmiş düzenli ödemeler (kişinin payı) ve abonelik yenilemeleri (eklendiği tarihten sonra) ayrı satırda; ödenmemiş vadeler `expected` altında. Ortak ödemenin açtığı kişisel kayıt iki kez sayılmaz |
 | `homeos_list_health_daily` | yalnız sağlık izni ve geçerli rıza varsa görünür |
 
 **Ekleme (yalnız yazma izinli bağlantı; hepsi `request_id`* ister):**
@@ -77,7 +77,7 @@ Durumsuz Streamable HTTP, yalnız JSON yanıt (SSE yok, `GET` 405). Protokol `20
 | `homeos_mark_paid` | `payment_id`*, `paid_on`, `amount` (ortak ödemede eşit bölüşümlü ortak gider açılır) |
 | `homeos_add_recurring_payment` | `title`*, `amount`*, `next_due`*, `currency`, `category`, `repeat_rule` (`days`/`monthly_day`/`monthly_window`), `repeat_days`, `repeat_day`, `repeat_window_end`, `responsible_user_id` (`homeos_list_members`), `shared`, `ends_on`, `installments_total`, `amount_is_estimate` |
 | `homeos_add_contact` | `name`*, `organization`, `phone`, `email`, `website` (https), `notes`, `asset_no` + `role` (`seller`/`maintainer`; ikisi birlikte) |
-| `homeos_add_insurance` | `asset_no` (verilmezse hane poliçesi: DASK, konut), `insurance_type`* (`dask/traffic/casco/home/mandatory/health/other`), `starts_on`*, `ends_on`*, `premium`*, `coverage`*, `currency`*, `provider`, `policy_number` |
+| `homeos_add_insurance` | `asset_no` (verilmezse, `null` ya da `0` ise hane poliçesi: DASK, konut), `insurance_type`* (`dask/traffic/casco/home/mandatory/health/other`), `starts_on`*, `ends_on`*, `premium`*, `coverage`*, `currency`*, `provider`, `policy_number` |
 | `homeos_add_household_document` | `filename`*, `content_base64`* (en çok 8 MB; taranır ve şifrelenir), `title`, `kind` (`lease`/`deposit`/`policy`/`other`), `expires_on`, `remind_days`, `deposit_amount`, `deposit_currency` |
 | `homeos_add_asset_document` | `asset_no`* (arşivlenmemiş), `filename`*, `content_base64`* (en çok 8 MB; PDF, JPEG, PNG, WebP, TXT, DOCX, XLSX; taranır ve şifrelenir). Sonuç `homeos_list_documents`'ta `source: asset` olarak görünür |
 | `homeos_add_asset_photo` | `asset_no`* (arşivlenmemiş), `filename`*, `content_base64`* (JPEG/PNG/WebP, en çok 5 MB; yeniden çizilir ve şifrelenir). Eşya başına bir fotoğraf; varsa reddedilir |
