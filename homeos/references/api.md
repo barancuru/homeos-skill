@@ -1,6 +1,6 @@
 # HomeOS API ve MCP başvurusu
 
-Sürüm: HomeOS 0.10.128, REST API 0.5.18, MCP 0.7.22 (2026-11-17). Canlı REST şeması: `GET https://home.curu.tr/api/openapi.json` (anahtar istemez). MCP'de kesin liste `tools/list`'tir; bu dosyayla çelişirse canlı yanıt doğrudur.
+Sürüm: HomeOS 0.10.130, REST API 0.5.19, MCP 0.7.22 (2026-11-18). Canlı REST şeması: `GET https://home.curu.tr/api/openapi.json` (anahtar istemez). MCP'de kesin liste `tools/list`'tir; bu dosyayla çelişirse canlı yanıt doğrudur.
 
 ## Kimlik doğrulama
 İki yol vardır, ikisi de aynı delegasyon, hane ve kota kurallarına bağlıdır.
@@ -51,7 +51,7 @@ Durumsuz Streamable HTTP, yalnız JSON yanıt (SSE yok, `GET` 405). Protokol `20
 | `homeos_list_documents` | `limit`, `offset`, `expires_before`, `asset_no` (`source`: asset, household, personal_entry); her satırda `key` (`asset:2` gibi; kimlik kaynaklar arasında çakışır, tekil tanım `key`'dir) |
 | `homeos_due` | `from`*, `to`* (en çok 400 gün), `include_overdue` (varsayılan true): bakım, tekrarlayan ödeme, garanti, hane belgesi (`documents`) ve poliçe (`insurance`) bitişleri; `overdue` kullanıcının saat dilimindeki **bugüne** göredir (sorgunun `from`'una göre değil); `from`'dan önce vadesi geçmiş etkin kalemleri `include_overdue` dahil eder; garanti, belge ve poliçe satırları da aynı kuralla `overdue` alır; arşivdeki varlığın garantisi girmez, `counts.overdue` sayar; garanti satırları da `kind: warranty_expiry` ve `overdue` taşır |
 | `homeos_list_shared_expenses` | `since`, `until`, `currency`, `limit`, `offset` (`balances`: üye başına net) |
-| `homeos_list_recurring` | `limit`, `offset`, `include_inactive` ya da eşdeğeri `include_archived` (varsayılan yalnız etkinler; pasifler `active: false`); her ödemede `last_paid_on`, `log_count`, `ends_on`, `installments_total`, `installments_remaining`, `amount_is_estimate`; son taksit ödenince ödeme pasifleşir, bitiş geçmiş ama ödenmemiş vade gecikmiş kalır |
+| `homeos_list_recurring` | `limit`, `offset`, `include_inactive` ya da eşdeğeri `include_archived` (varsayılan yalnız etkinler; pasifler `active: false`); her ödemede `last_paid_on`, `log_count`, `ends_on`, `installments_total`, `installments_remaining` (taksit sayısından ya da yalnız bitiş tarihi varsa ondan; kaynağı `installments_source`: `count`/`end_date`), `amount_is_estimate`; son taksit ödenince ödeme pasifleşir, bitiş geçmiş ama ödenmemiş vade gecikmiş kalır |
 | `homeos_list_payment_logs` | `payment_id`, `since`, `until`, `limit`, `offset`: ödeme kayıtları (`id`, `payment_id`, `title`, `paid_on`, `amount`, `currency`, `paid_by`, `shared_expense_id`, `added_by_agent`); silmek için `id` → `homeos_delete payment_log` |
 | `homeos_list_personal_entries` | `since`, `until`, `category`, `currency`, `kind`, `limit`, `offset` (her kayıtta `account` ve `attachment_count`) |
 | `homeos_list_personal_categories` | `include_archived` |
