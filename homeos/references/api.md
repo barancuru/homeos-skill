@@ -1,6 +1,6 @@
 # HomeOS API ve MCP başvurusu
 
-Sürüm: HomeOS 0.10.130, REST API 0.5.19, MCP 0.7.22 (2026-11-18). Canlı REST şeması: `GET https://home.curu.tr/api/openapi.json` (anahtar istemez). MCP'de kesin liste `tools/list`'tir; bu dosyayla çelişirse canlı yanıt doğrudur.
+Sürüm: HomeOS 0.10.133, REST API 0.5.19, MCP 0.7.25 (2026-11-18). Canlı REST şeması: `GET https://home.curu.tr/api/openapi.json` (anahtar istemez). MCP'de kesin liste `tools/list`'tir; bu dosyayla çelişirse canlı yanıt doğrudur.
 
 ## Kimlik doğrulama
 İki yol vardır, ikisi de aynı delegasyon, hane ve kota kurallarına bağlıdır.
@@ -81,6 +81,7 @@ Durumsuz Streamable HTTP, yalnız JSON yanıt (SSE yok, `GET` 405). Protokol `20
 | `homeos_add_household_document` | `filename`*, `content_base64`* (en çok 8 MB; taranır ve şifrelenir), `title`, `kind` (`lease`/`deposit`/`policy`/`other`), `expires_on`, `remind_days`, `deposit_amount`, `deposit_currency` |
 | `homeos_add_asset_document` | `asset_no`* (arşivlenmemiş), `filename`*, `content_base64`* (en çok 8 MB; PDF, JPEG, PNG, WebP, TXT, DOCX, XLSX; taranır ve şifrelenir). Sonuç `homeos_list_documents`'ta `source: asset` olarak görünür |
 | `homeos_add_asset_photo` | `asset_no`* (arşivlenmemiş), `filename`*, `content_base64`* (JPEG/PNG/WebP, en çok 5 MB; yeniden çizilir ve şifrelenir). Eşya başına bir fotoğraf; varsa reddedilir. `replace: true` (yalnız `mcp:update` ile) var olanı değiştirir, yanıtta `replaced` |
+| `homeos_create_upload_link` | `asset_no`* (arşivlenmemiş), `kind`* (`photo`/`document`), `replace` (yalnız `photo`, `mcp:update` ile). Yanıt: `url`, `curl`, `expires_at`, `single_use`. Bağlantı 15 dk, tek kullanım; tarayıcı formu ya da `curl -F file=@...`/`PUT` (JSON yanıt: `asset_no`, `mime_type`, `size_bytes`, `replaced`). Fotoğraf girişi en çok 20 MB (multipart'ta sunucunun `post_max_size` sınırı), uzun kenar 2560 px'e küçültülür |
 
 - `request_id`: 8–64 karakter, `A-Z a-z 0-9 . _ : -`. Aynı kimlikle ikinci çağrı yeni kayıt açmaz, ilk sonucu döner. Ağ hatasından sonra aynı `request_id` ile dene.
 - Ajanın eklediği kayıtlar arayüzde "Ajan ekledi" işaretiyle görünür.
@@ -91,6 +92,7 @@ Durumsuz Streamable HTTP, yalnız JSON yanıt (SSE yok, `GET` 405). Protokol `20
 |---|---|
 | `homeos_update_asset` | `asset_no`*, sonra `homeos_create_asset` alanlarından istenenler (`ownership` dahil). Boş metin isteğe bağlı alanı temizler |
 | `homeos_update_maintenance_plan` | `plan_id`*, `title`, `next_due`, `repeat_rule`, `repeat_days`, `repeat_day`, `repeat_window_end`, `description`, `is_active` (görevli ve checklist değişmez) |
+| `homeos_start_plans_today` | `plan_ids`* (1–50, `homeos_list_maintenance_plans` id), `dry_run` (varsayılan true: değiştirmez). `next_due` tekrar kuralına göre bugünden sonraki ilk vade olur, `due_unverified` kalkar; biri uygun değilse hiçbiri değişmez. Yanıt: `plans` = `{plan_id, title, old_next_due, new_next_due}` |
 | `homeos_update_recurring_payment` | `payment_id`*, `homeos_add_recurring_payment` alanları (pasif ödeme güncellenmez) |
 | `homeos_update_subscription` | `subscription_id`*, `name`, `provider`, `amount`, `currency`, `next_due_on`, `repeat_months` (yalnız ev aboneliği; hane yöneticisi) |
 | `homeos_update_personal_subscription` | `subscription_id`* (`homeos_list_subscriptions`, satırda `scope: personal`), `name`, `amount`, `currency`, `period`, `renews_on_day`, `renews_month`, `account` (hesap adı; boş metin bağı kaldırır, adla hesap yoksa hata), `reminder_days`. Yalnız kendi aboneliğin |
@@ -142,5 +144,6 @@ Durumsuz Streamable HTTP, yalnız JSON yanıt (SSE yok, `GET` 405). Protokol `20
 | 500 | `internal_error` | Bir kez sonra yeniden dene; sürerse kullanıcıya bildir |
 | MCP 403 | `invalid_origin` / `invalid_host` | Adres `https://home.curu.tr/mcp` olmalı (port 443) |
 | MCP `-32001` | `write_not_permitted` / `update_not_permitted` / `delete_not_permitted` | Bağlantının yazma, güncelleme ya da arşivleme/silme izni yok |
+| MCP alan hatası | `content_base64`: "base64 çözülemedi" / tür ya da görsel okunamadı / boyut sınırı (MB) | Mesajdaki nedeni düzelt; büyük dosyada `homeos_create_upload_link` |
 | MCP `-32001` | `owner_required` | İşlemi yalnız hane sahibi yapabilir |
 | MCP `-32602` | `message` | Araç adı ya da argüman geçersiz. Yazma araçlarında mesaj alanı söyler (ör. `amount: en çok 2 ondalık`); düzeltip yeni `request_id` ile dene |
